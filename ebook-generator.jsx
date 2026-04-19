@@ -1,4 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// ── Firebase config ───────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyByeWwe7ydn6JYYlbeygvRo1UnRc8psC0I",
+  authDomain: "ebookai-1721a.firebaseapp.com",
+  projectId: "ebookai-1721a",
+  storageBucket: "ebookai-1721a.firebasestorage.app",
+  messagingSenderId: "35404785803",
+  appId: "1:35404785803:web:e2788cc31a471f23dc4c8e",
+  measurementId: "G-XSX0HSQ93T"
+};
+
+async function getFirebase() {
+  if(window._fbAuth) return window._fbAuth;
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+  const { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+  const app = initializeApp(FIREBASE_CONFIG);
+  const auth = getAuth(app);
+  window._fbAuth = { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut };
+  return window._fbAuth;
+}
 
 const FONTS = [
   { label: "Playfair Display", value: "Playfair Display", import: "Playfair+Display:ital,wght@0,400;0,700;1,400" },
@@ -437,21 +458,32 @@ export default function App() {
   const [page, setPage] = useState("landing");
   const [user, setUser] = useState(null);
   const [plan, setPlan] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  // Handle Stripe redirect back
-  useState(()=>{
+  useEffect(()=>{
+    getFirebase().then(({auth, onAuthStateChanged})=>{
+      onAuthStateChanged(auth, u=>{
+        if(u){ setUser({email:u.email, name:u.email.split("@")[0], uid:u.uid}); }
+        else { setUser(null); }
+        setAuthLoading(false);
+      });
+    });
+    // Handle Stripe redirect
     const params = new URLSearchParams(window.location.search);
     if(params.get("success")==="true"){
       const pl = params.get("plan")||"starter";
-      setUser({name:"Client",email:""});
       setPlan(pl);
       setPage("app");
       window.history.replaceState({},"","/");
     }
-  });
+  },[]);
   function goTo(p) { setPage(p); window.scrollTo(0,0); }
   function handleAuth(u, pl) { setUser(u); if(pl){setPlan(pl);goTo("app");}else goTo("pricing"); }
-  function logout() { setUser(null); setPlan(null); goTo("landing"); }
+  async function logout() { 
+    const { auth, signOut } = await getFirebase();
+    await signOut(auth);
+    setUser(null); setPlan(null); goTo("landing"); 
+  }
   return (
     <>
       <style>{GLOBAL_CSS}</style>
@@ -820,13 +852,28 @@ function Landing({ onLogin, onSignup, onStart, onExamples }) {
 function AuthPage({ mode, onAuth, switchMode, onBack }) {
   const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [name,setName]=useState(""); const [error,setError]=useState(""); const [loading,setLoading]=useState(false);
   const isLogin = mode==="login";
-  function handleSubmit(){
+  async function handleSubmit(){
     setError("");
     if(!email.trim()||!password.trim()){setError("Veuillez remplir tous les champs.");return;}
     if(!email.includes("@")){setError("Adresse email invalide.");return;}
     if(password.length<6){setError("Le mot de passe doit faire au moins 6 caractères.");return;}
     setLoading(true);
-    setTimeout(()=>{setLoading(false);onAuth({email,name:name||email.split("@")[0]});},900);
+    try {
+      const { auth, createUserWithEmailAndPassword, signInWithEmailAndPassword } = await getFirebase();
+      if(isLogin){
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
+      onAuth({ email, name: name || email.split("@")[0] });
+    } catch(e) {
+      const msg = e.code === "auth/user-not-found" ? "Compte introuvable." :
+                  e.code === "auth/wrong-password" ? "Mot de passe incorrect." :
+                  e.code === "auth/email-already-in-use" ? "Cet email est déjà utilisé." :
+                  "Une erreur s'est produite. Réessaie.";
+      setError(msg);
+      setLoading(false);
+    }
   }
   return (
     <div className="auth-page">
@@ -850,9 +897,9 @@ function AuthPage({ mode, onAuth, switchMode, onBack }) {
 
 // ── Pricing ───────────────────────────────────────────────────
 function PricingPage({ user, onSelect }) {
-  const STRIPE_KEY = "pk_test_51TNy8RDNUTLKyjZsZyfHBGOAB2NznqLJM8VigTFGvxtNOSXEwmNOV6SUPVwmUCIPNKfQbyajaW0UIbegdYh1hTSU00wCtKQqbi";
-  const PRICE_STARTER = "price_1TNyG1DNUTLKyjZseLhZfot1";
-  const PRICE_PRO = "price_1TNyKGDNUTLKyjZsuqeMUSoI";
+  const STRIPE_KEY = "pk_live_51TNy86RWpjjN39uEqSbybqRAaD3Hlt2ucaSzL4gkewM8w9xRovNV10DEzJH618JImnW6dYPBtUv7AeJCj8y3WwJK00rJHE0XKf";
+  const PRICE_STARTER = "price_1TO0tvRWpjjN39uEmnJzNoSN";
+  const PRICE_PRO = "price_1TO0tvRWpjjN39uErq4vEjoC";
   const [loading, setLoading] = useState(null);
 
   async function handleCheckout(plan) {
