@@ -394,8 +394,8 @@ function Landing({ onLogin, onSignup, onStart }) {
       <nav className="nav">
         <div className="nav-logo"><div className="nav-logo-icon">📚</div><div className="nav-logo-text">EbookAI</div></div>
         <div className="nav-links">
-          <button className="nav-link">Fonctionnalités</button>
-          <button className="nav-link">Tarifs</button>
+          <button className="nav-link" onClick={()=>document.getElementById("fonctionnalites")?.scrollIntoView({behavior:"smooth"})}>Fonctionnalités</button>
+          <button className="nav-link" onClick={()=>document.getElementById("tarifs")?.scrollIntoView({behavior:"smooth"})}>Tarifs</button>
           <button className="nav-link" onClick={onLogin}>Connexion</button>
           <button className="nav-cta" onClick={onSignup}>Commencer</button>
         </div>
@@ -411,7 +411,7 @@ function Landing({ onLogin, onSignup, onStart }) {
         </div>
         <div className="hero-scroll">↓ Découvrir</div>
       </section>
-      <section className="features">
+      <section className="features" id="fonctionnalites">
         <div className="container">
           <div className="features-header">
             <div className="section-eyebrow">Fonctionnalités</div>
@@ -466,7 +466,7 @@ function Landing({ onLogin, onSignup, onStart }) {
           </div>
         </div>
       </section>
-      <section className="landing-pricing">
+      <section className="landing-pricing" id="tarifs">
         <div className="container">
           <div className="section-eyebrow">Tarifs</div>
           <h2 className="section-title">Simple et transparent</h2>
