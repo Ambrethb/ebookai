@@ -437,6 +437,18 @@ export default function App() {
   const [page, setPage] = useState("landing");
   const [user, setUser] = useState(null);
   const [plan, setPlan] = useState(null);
+
+  // Handle Stripe redirect back
+  useState(()=>{
+    const params = new URLSearchParams(window.location.search);
+    if(params.get("success")==="true"){
+      const pl = params.get("plan")||"starter";
+      setUser({name:"Client",email:""});
+      setPlan(pl);
+      setPage("app");
+      window.history.replaceState({},"","/");
+    }
+  });
   function goTo(p) { setPage(p); window.scrollTo(0,0); }
   function handleAuth(u, pl) { setUser(u); if(pl){setPlan(pl);goTo("app");}else goTo("pricing"); }
   function logout() { setUser(null); setPlan(null); goTo("landing"); }
@@ -838,6 +850,36 @@ function AuthPage({ mode, onAuth, switchMode, onBack }) {
 
 // ── Pricing ───────────────────────────────────────────────────
 function PricingPage({ user, onSelect }) {
+  const STRIPE_KEY = "pk_test_51TNy8RDNUTLKyjZsZyfHBGOAB2NznqLJM8VigTFGvxtNOSXEwmNOV6SUPVwmUCIPNKfQbyajaW0UIbegdYh1hTSU00wCtKQqbi";
+  const PRICE_STARTER = "price_1TNyG1DNUTLKyjZseLhZfot1";
+  const PRICE_PRO = "price_1TNyKGDNUTLKyjZsuqeMUSoI";
+  const [loading, setLoading] = useState(null);
+
+  async function handleCheckout(plan) {
+    setLoading(plan);
+    try {
+      if(!window.Stripe) {
+        await new Promise((res,rej)=>{
+          const s=document.createElement("script");
+          s.src="https://js.stripe.com/v3/";
+          s.onload=res; s.onerror=rej;
+          document.head.appendChild(s);
+        });
+      }
+      const stripe = window.Stripe(STRIPE_KEY);
+      const priceId = plan==="starter" ? PRICE_STARTER : PRICE_PRO;
+      await stripe.redirectToCheckout({
+        lineItems:[{price:priceId, quantity:1}],
+        mode:"subscription",
+        successUrl: window.location.origin+"?success=true&plan="+plan,
+        cancelUrl: window.location.origin+"?canceled=true",
+        customerEmail: user?.email,
+      });
+    } catch(e) {
+      alert("Erreur lors du paiement. Réessaie !");
+      setLoading(null);
+    }
+  }
   return (
     <div className="page" style={{paddingTop:"5rem"}}>
       <nav className="nav">
@@ -861,7 +903,7 @@ function PricingPage({ user, onSelect }) {
                 <li key={f} className="lp-feat"><span className="lp-feat-icon no">✗</span><span style={{opacity:.35}}>{f}</span></li>
               ))}
             </ul>
-            <button className="lp-btn" onClick={()=>onSelect("starter")}>Choisir Starter →</button>
+            <button className="lp-btn" onClick={()=>handleCheckout("starter")} disabled={loading==="starter"}>{loading==="starter"?"Chargement...":"Choisir Starter →"}</button>
           </div>
           <div className="lp-card popular" style={{cursor:"pointer"}} onClick={()=>onSelect("pro")}>
             <div className="lp-popular-tag">⭐ Recommandé</div>
@@ -873,7 +915,7 @@ function PricingPage({ user, onSelect }) {
                 <li key={f} className="lp-feat"><span className="lp-feat-icon">✓</span>{f}</li>
               ))}
             </ul>
-            <button className="lp-btn" onClick={()=>onSelect("pro")}>Choisir Pro →</button>
+            <button className="lp-btn" onClick={()=>handleCheckout("pro")} disabled={loading==="pro"}>{loading==="pro"?"Chargement...":"Choisir Pro →"}</button>
           </div>
         </div>
       </div>
